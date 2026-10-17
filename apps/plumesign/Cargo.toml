@@ -15,6 +15,7 @@ env_logger.workspace = true
 log.workspace = true
 rustls.workspace = true
 goblin.workspace = true
+serde_json.workspace = true
 plume_core = { path = "../../crates/plume_core", features = ["tweaks"] }
 plume_utils = { path = "../../crates/plume_utils" }
 plume_store = { path = "../../crates/plume_store" }

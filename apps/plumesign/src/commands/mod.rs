@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 pub mod account;
 pub mod device;
 pub mod macho;
+pub mod mcp;
 pub mod sign;
 
 #[derive(Debug, Parser)]
@@ -29,4 +30,6 @@ pub enum Commands {
     Account(account::AccountArgs),
     /// Device management commands
     Device(device::DeviceArgs),
+    /// Run as an MCP server over stdio (list devices, install .ipa files)
+    Mcp,
 }

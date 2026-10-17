@@ -59,6 +59,11 @@ pub const DEFAULT_ANISETTE_URL: &str = "https://ani.f1sh.me/";
 
 pub const DEFAULT_ANISETTE_URL_V3: &str = "https://ani.sidestore.app";
 
+/// File (inside the configuration path) holding the persisted anisette state.
+/// Bumped whenever the client identity changes so state provisioned under an
+/// old identity is ignored and the device is provisioned again.
+pub const ANISETTE_STATE_FILE: &str = "anisette_state_v2.plist";
+
 #[derive(Clone, Debug)]
 pub struct AnisetteConfiguration {
     anisette_url: String,

@@ -96,7 +96,22 @@ impl Account {
             .send()
             .await?;
 
-        let res: plist::Dictionary = plist::from_bytes(res.text().await?.as_bytes())?;
+        let status = res.status();
+        let url = res.url().to_string();
+        let text = res.text().await?;
+
+        // Apple may answer a wrong code with a non-2xx status and a plist body,
+        // so only report the HTTP status when the body is not a plist.
+        let res: plist::Dictionary = match plist::from_bytes(text.as_bytes()) {
+            Ok(dict) => dict,
+            Err(_) if !status.is_success() => {
+                return Err(Error::GeneralHttpError {
+                    url,
+                    status: status.as_u16(),
+                });
+            }
+            Err(e) => return Err(e.into()),
+        };
 
         super::check_error(&res)?;
 

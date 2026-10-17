@@ -111,8 +111,20 @@ impl DeveloperSession {
         log::debug!("QH Request to {}: {:?}", url, body);
 
         let response = request_builder.body(buffer).send().await?;
+        let status = response.status();
         let response_bytes = response.bytes().await?;
-        let response_dict: Dictionary = plist::from_bytes(&response_bytes)?;
+        // Apple may return a non-2xx status with a valid QH plist carrying a
+        // resultCode, so only report the HTTP status when the body is not a plist.
+        let response_dict: Dictionary = match plist::from_bytes(&response_bytes) {
+            Ok(dict) => dict,
+            Err(_) if !status.is_success() => {
+                return Err(Error::GeneralHttpError {
+                    url: url.to_string(),
+                    status: status.as_u16(),
+                });
+            }
+            Err(e) => return Err(e.into()),
+        };
 
         log::debug!("QH Response from {}: {:?}", url, response_dict);
 

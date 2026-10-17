@@ -19,6 +19,7 @@ async fn main() -> anyhow::Result<()> {
         Commands::MachO(args) => commands::macho::execute(args).await?,
         Commands::Account(args) => commands::account::execute(args).await?,
         Commands::Device(args) => commands::device::execute(args).await?,
+        Commands::Mcp => commands::mcp::serve()?,
     }
 
     Ok(())

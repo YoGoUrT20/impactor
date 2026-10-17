@@ -1,9 +1,8 @@
-use std::io::Write;
 use std::path::PathBuf;
 
 use anyhow::{Ok, Result};
 use clap::{Args, Subcommand};
-use dialoguer::Select;
+use dialoguer::{Password, Select};
 
 use plume_core::{AnisetteConfiguration, auth::Account, developer::DeveloperSession};
 use plume_store::AccountStore;
@@ -199,12 +198,7 @@ async fn login(args: LoginArgs) -> Result<()> {
     let password = if let Some(pass) = args.password {
         pass
     } else {
-        print!("Enter password: ");
-        std::io::stdout().flush()?;
-
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input)?;
-        input.trim().to_string()
+        Password::new().with_prompt("Enter password").interact()?
     };
 
     let login_closure = || -> std::result::Result<(String, String), String> {

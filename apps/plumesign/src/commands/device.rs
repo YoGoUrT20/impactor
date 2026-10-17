@@ -6,13 +6,16 @@ use dialoguer::Select;
 use idevice::{
     IdeviceService,
     installation_proxy::InstallationProxyClient,
-    usbmuxd::{UsbmuxdAddr, UsbmuxdConnection},
+    usbmuxd::{Connection, UsbmuxdAddr, UsbmuxdConnection},
 };
-use plume_utils::{Device, Package, get_device_for_id};
+use plume_utils::{Device, Package};
 
 #[derive(Debug, Args)]
 #[command(arg_required_else_help = true)]
 pub struct DeviceArgs {
+    /// List connected devices as JSON and exit
+    #[arg(short = 'l', long = "list")]
+    pub list: bool,
     /// Device UDID to target (optional, will prompt if not provided)
     #[arg(
         short = 'u',
@@ -46,6 +49,23 @@ pub struct DeviceArgs {
 }
 
 pub async fn execute(args: DeviceArgs) -> Result<()> {
+    if args.list {
+        let devices: Vec<_> = list_devices()
+            .await?
+            .iter()
+            .map(|d| {
+                serde_json::json!({
+                    "name": d.name,
+                    "udid": d.udid,
+                    "device_id": d.device_id,
+                    "connection": connection_name(d),
+                })
+            })
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&devices)?);
+        return Ok(());
+    }
+
     let device = {
         #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
         {
@@ -113,23 +133,47 @@ pub async fn execute(args: DeviceArgs) -> Result<()> {
     Ok(())
 }
 
-pub async fn select_device(device_udid: Option<String>) -> Result<Device> {
-    if let Some(udid) = device_udid {
-        return Ok(get_device_for_id(&udid).await?);
-    }
-
+pub async fn list_devices() -> Result<Vec<Device>> {
     let mut muxer = UsbmuxdConnection::default().await?;
     let devices = muxer.get_devices().await?;
 
+    let device_futures: Vec<_> = devices.into_iter().map(|d| Device::new(d)).collect();
+
+    Ok(futures::future::join_all(device_futures).await)
+}
+
+pub fn connection_name(device: &Device) -> &'static str {
+    match device.usbmuxd_device.as_ref().map(|d| &d.connection_type) {
+        Some(Connection::Usb) => "usb",
+        Some(Connection::Network(_)) => "wifi",
+        Some(Connection::Unknown(_)) => "unknown",
+        None => "local",
+    }
+}
+
+pub async fn select_device(device_udid: Option<String>) -> Result<Device> {
+    let devices = list_devices().await?;
+
     if devices.is_empty() {
         return Err(anyhow::anyhow!(
-            "No devices connected. Please connect a device or specify a UDID with --device-udid"
+            "No devices connected. Please connect a device or specify a UDID with --udid"
         ));
     }
 
-    let device_futures: Vec<_> = devices.into_iter().map(|d| Device::new(d)).collect();
+    // Accept either the device UDID or the usbmuxd device id, preferring a USB connection
+    // when the same device is also visible over Wi-Fi.
+    if let Some(id) = device_udid {
+        let mut matches: Vec<_> = devices
+            .into_iter()
+            .filter(|d| d.udid.eq_ignore_ascii_case(&id) || d.device_id.to_string() == id)
+            .collect();
+        matches.sort_by_key(|d| connection_name(d) != "usb");
 
-    let devices = futures::future::join_all(device_futures).await;
+        return matches
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Device {id} not found"));
+    }
 
     let device_names: Vec<String> = devices.iter().map(|d| d.to_string()).collect();
 

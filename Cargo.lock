@@ -5741,6 +5741,7 @@ dependencies = [
  "plume_store",
  "plume_utils",
  "rustls",
+ "serde_json",
  "tokio",
 ]
 
